@@ -1,3 +1,5 @@
+// this is written by claude too just like the OAuth html page
+
 export const generateForgetPasswordHtml = (name, otp) => {
   const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
