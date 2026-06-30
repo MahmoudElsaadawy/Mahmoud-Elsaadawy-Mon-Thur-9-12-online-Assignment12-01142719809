@@ -15,6 +15,11 @@ router.patch("/confirm-email", confirmEmail)
 router.patch("/resend-confirm-mail-otp", auth, resendOtpService)
 router.post("/login", validation(loginSchema), loginService)
 router.post("/refresh-token", refreshToken)
+
+router.get("/social-login",(req, res)=>{
+  res.sendFile(path.resolve(dirname, "../../../FE/googleOAuth.html"))
+})
+
 router.post("/social-login", socialLogin)
 router.get("/reset-password/:token",(req, res)=>{
   res.sendFile(path.resolve(dirname, "../../../FE/resetPassword.html"))

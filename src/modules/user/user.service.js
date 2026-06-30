@@ -238,7 +238,7 @@ export const socialLogin = async (req, res) => {
   let user = await User.findOne({ email });
   if (user) {
     if (user.provider == providerEnum.System) {
-      badRequestException("use system login");
+      badRequestException("Email already signed up please system login");
     }
   } else {
     user = await User.create({
