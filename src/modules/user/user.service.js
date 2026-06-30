@@ -307,59 +307,75 @@ export const coverPicsService = uploadFiles({
   fileType: "files",
 }).array("coverImages", 3);
 
-export const resetPasswordService = async(req, res)=> {
-  const { email, password, otp } = req.body
-  const user = await User.findOne({email})
-  if(!user){
-    badRequestException("User doesnt exist please sign up")
-  }
-
-  const userOtp = await redisClient.get(`Users:${user._id}:otp:passwordReset`)
-
-  if(!userOtp || userOtp != otp){
-    badRequestException("Invalid or expired otp")
-  }
-
-  user.password = await hash(password)
-  await user.save()
-  await redisClient.del(`Users:${user._id}:otp:passwordReset`)
-
-  successResponse({
-    res,
-    message: "Password changed successfully",
-  })
-}
-
-export const resendResetPasswordService = async(req, res)=> {
+export const forgetPasswordService = async(req, res)=> {
   const { email } = req.body
   const user = await User.findOne({email})
   if(!user){
     badRequestException("User doesnt exist please sign up")
   }
 
-  const isOtpExist = await redisClient.get(`Users:${user._id}:otp:passwordReset`)
+  const userResetToken = await redisClient.get(`Users:${user._id}:otp:passwordReset`)
   
-  if(isOtpExist){
+  if(userResetToken){
     const ttl = await redisClient.TTL(`Users:${user._id}:otp:passwordReset`)
-    badRequestException(`wait ${ttl} seconds to resend the otp`)
+    badRequestException(`wait ${ttl} seconds before requesting the email again`)
   }
 
-  const otp = createOtp();
-  await redisClient.set(`Users:${user._id}:otp:passwordReset`, otp, {
+  const resetToken = await generateToken(
+    {
+      _id: user.id,
+      email: user.email,
+    },
+    process.env.FORGET_PASSWORD_TOKEN,
+    {
+      expiresIn: "10m",
+    },
+  );
+  await redisClient.set(`Users:${user._id}:otp:passwordReset`, resetToken, {
     expiration: {
       type: "ex",
-      value: 5 * 60,
+      value: 10 * 60,
     }
   })
+  
+  const link = `${process.env.BASE_URL}${process.env.PORT}/users/reset-password/${resetToken}`
 
   sendEmail({
     to: user.email,
     subject: "Password reset",
-    html: generateForgetPasswordHtml(user.firstName, otp),
+    html: generateForgetPasswordHtml(user.firstName, link),
   });
 
   successResponse({
     res,
     message: "Password reset email sent successfully",
+    data:{
+      message: "Dont forget to check the html page that i made too",
+      forgetPasswordToken: resetToken,
+    }
+  })
+}
+
+export const resetPasswordService = async(req, res)=> {
+  const { token } = req.params
+  const { password } = req.body
+  const tokenValidation = verifyToken(token, process.env.FORGET_PASSWORD_TOKEN);
+  const user = await User.findById(tokenValidation._id);
+  if (!user) {
+    notFoundException("user not found");
+  }
+
+  const userResetToken = await redisClient.get(`Users:${user._id}:otp:passwordReset`)
+  if (userResetToken != token){
+    badRequestException("invalid or expired link please request another one")
+  }
+
+  await redisClient.del(`Users:${user._id}:otp:passwordReset`)
+  user.password = await hash(password)
+  await user.save()
+
+  successResponse({
+    res,
+    message: "Password changed successfully",
   })
 }

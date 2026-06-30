@@ -24,9 +24,7 @@ export const loginSchema = {
 
 export const resetPasswordSchema = {
   body: joi.object({
-    email: joi.string().email().required(),
     password: joi.string().min(8).required(),
     confirmPassword: joi.string().valid(joi.ref("password")).required(),
-    otp: joi.string().min(6).max(6).required(),
   }),
 }
